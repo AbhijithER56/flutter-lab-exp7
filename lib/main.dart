@@ -4,6 +4,13 @@ import 'package:firebase_core/firebase_core.dart';
 import 'employee_screen.dart';
 import 'firebase_options.dart';
 
+// Palette: deep forest, mint, gold salary tag on a pale green page
+const Color kForest = Color(0xFF0E3B2E);
+const Color kMint = Color(0xFF7FE0B6);
+const Color kGold = Color(0xFFE9B949);
+const Color kPage = Color(0xFFF1F7F3);
+const Color kMuted = Color(0xFF5F7A6E);
+
 Future<void> main() async {
   // Required before calling native code (Firebase) ahead of runApp().
   WidgetsFlutterBinding.ensureInitialized();
@@ -32,9 +39,16 @@ class EmployeeApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Employee Application',
-      debugShowCheckedModeBanner: true,
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        colorScheme: ColorScheme.fromSeed(seedColor: kForest),
+        scaffoldBackgroundColor: kPage,
+        appBarTheme: const AppBarTheme(
+          backgroundColor: kForest,
+          foregroundColor: Colors.white,
+          centerTitle: true,
+          elevation: 0,
+        ),
         useMaterial3: true,
       ),
       home: initError == null
@@ -54,10 +68,7 @@ class _FirebaseErrorScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.yellow,
-        title: const Text('Employee Application'),
-      ),
+      appBar: AppBar(title: const Text('Employee Application')),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(24),

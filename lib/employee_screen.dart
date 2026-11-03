@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import 'main.dart' show kForest, kMint, kGold, kMuted;
+
 /// Employee registration form + live list of employees stored in the
 /// Cloud Firestore collection "employees".
 class EmployeeScreen extends StatefulWidget {
@@ -107,83 +109,147 @@ class _EmployeeScreenState extends State<EmployeeScreen> {
     return null;
   }
 
+  // 67000 -> "₹67,000", 1250000 -> "₹12,50,000" (Indian grouping)
+  String _rupees(Object? value) {
+    if (value is! num) return '-';
+    final s = value.round().toString();
+    if (s.length <= 3) return '₹$s';
+    final head = s.substring(0, s.length - 3).replaceAllMapped(
+          RegExp(r'(\d)(?=(\d\d)+$)'),
+          (m) => '${m[1]},',
+        );
+    return '₹$head,${s.substring(s.length - 3)}';
+  }
+
   Widget _buildField({
     required TextEditingController controller,
     required String label,
+    required IconData icon,
     required String? Function(String?) validator,
     bool numeric = false,
     TextInputAction action = TextInputAction.next,
   }) {
+    OutlineInputBorder border(Color c, [double w = 1]) => OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: c, width: w),
+        );
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.only(bottom: 8),
       child: TextFormField(
         controller: controller,
         validator: validator,
         keyboardType: numeric ? TextInputType.number : TextInputType.name,
         textInputAction: action,
-        onFieldSubmitted: action == TextInputAction.done
-            ? (_) => _addEmployee()
-            : null,
+        onFieldSubmitted:
+            action == TextInputAction.done ? (_) => _addEmployee() : null,
         decoration: InputDecoration(
           labelText: label,
-          border: const OutlineInputBorder(),
+          prefixIcon: Icon(icon, color: kForest, size: 20),
+          filled: true,
+          fillColor: const Color(0xFFF7FBF9),
           isDense: true,
+          border: border(const Color(0xFFD3E5DB)),
+          enabledBorder: border(const Color(0xFFD3E5DB)),
+          focusedBorder: border(kForest, 1.8),
         ),
       ),
     );
   }
 
   Widget _buildForm() {
-    return Form(
-      key: _formkey,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _buildField(
-            controller: _namecontroller,
-            label: "Enter your Name",
-            validator: _validateName,
-          ),
-          _buildField(
-            controller: _empidcontroller,
-            label: "Enter your EmpID",
-            validator: _validateEmpId,
-            numeric: true,
-          ),
-          _buildField(
-            controller: _salarycontroller,
-            label: "Enter your Salary",
-            validator: _validateSalary,
-            numeric: true,
-            action: TextInputAction.done,
-          ),
-          const SizedBox(height: 6),
-          ElevatedButton(
-            onPressed: _saving ? null : _addEmployee,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.deepPurple,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 24),
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFDCEBE2)),
+      ),
+      child: Form(
+        key: _formkey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.badge, color: kForest),
+                SizedBox(width: 8),
+                Text(
+                  'New team member',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: kForest,
+                  ),
+                ),
+              ],
             ),
-            child: _saving
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
-                : const Text("Save Details"),
-          ),
-          const SizedBox(height: 10),
-          if (_status.isNotEmpty)
-            Text(
-              _status,
-              textAlign: TextAlign.center,
-              style: TextStyle(color: _isError ? Colors.red : Colors.green),
+            const SizedBox(height: 10),
+            _buildField(
+              controller: _namecontroller,
+              label: "Enter your Name",
+              icon: Icons.person_outline,
+              validator: _validateName,
             ),
-        ],
+            _buildField(
+              controller: _empidcontroller,
+              label: "Enter your EmpID",
+              icon: Icons.numbers,
+              validator: _validateEmpId,
+              numeric: true,
+            ),
+            _buildField(
+              controller: _salarycontroller,
+              label: "Enter your Salary",
+              icon: Icons.currency_rupee,
+              validator: _validateSalary,
+              numeric: true,
+              action: TextInputAction.done,
+            ),
+            const SizedBox(height: 4),
+            FilledButton(
+              onPressed: _saving ? null : _addEmployee,
+              style: FilledButton.styleFrom(
+                backgroundColor: kForest,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              child: _saving
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Text("Save Details"),
+            ),
+            if (_status.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: (_isError ? Colors.red : Colors.green)
+                      .withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  _status,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: _isError ? Colors.red : Colors.green.shade800,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -206,24 +272,107 @@ class _EmployeeScreenState extends State<EmployeeScreen> {
           return const Center(child: CircularProgressIndicator());
         }
         final records = snapshot.data!.docs;
-        if (records.isEmpty) {
-          return const Center(child: Text("No Employees Found"));
-        }
-        return ListView.builder(
-          itemCount: records.length,
-          itemBuilder: (context, index) {
-            // Read defensively: documents added by hand in the console
-            // may be missing a field.
-            final employee =
-                records[index].data() as Map<String, dynamic>? ?? {};
-            return ListTile(
-              title: Text("${employee['name'] ?? '(no name)'}"),
-              subtitle: Text(
-                "EMPID: ${employee['empid'] ?? '-'} "
-                "SALARY:${employee['salary'] ?? '-'}",
+        return Column(
+          children: [
+            // Live directory header with the record count
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  const Text(
+                    'Directory',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 16,
+                      color: kForest,
+                    ),
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: kMint.withValues(alpha: 0.35),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '${records.length} live',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: kForest,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            );
-          },
+            ),
+            Expanded(
+              child: records.isEmpty
+                  ? const Center(child: Text("No Employees Found"))
+                  : ListView.builder(
+                      itemCount: records.length,
+                      itemBuilder: (context, index) {
+                        // Read defensively: documents added by hand in the
+                        // console may be missing a field.
+                        final employee = records[index].data()
+                                as Map<String, dynamic>? ??
+                            {};
+                        final name = "${employee['name'] ?? '(no name)'}";
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(18),
+                            border:
+                                Border.all(color: const Color(0xFFDCEBE2)),
+                          ),
+                          child: ListTile(
+                            dense: true,
+                            leading: Container(
+                              width: 42,
+                              height: 42,
+                              decoration: BoxDecoration(
+                                color: kForest,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              alignment: Alignment.center,
+                              child: Icon(Icons.person,
+                                  color: kMint.withValues(alpha: 0.9)),
+                            ),
+                            title: Text(
+                              name,
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w700),
+                            ),
+                            subtitle: Text(
+                              "EMPID: ${employee['empid'] ?? '-'} "
+                              "SALARY:${employee['salary'] ?? '-'}",
+                              style: const TextStyle(
+                                  color: kMuted, fontSize: 12),
+                            ),
+                            trailing: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: kGold.withValues(alpha: 0.28),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                _rupees(employee['salary']),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 12,
+                                  color: kForest,
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
         );
       },
     );
@@ -232,10 +381,7 @@ class _EmployeeScreenState extends State<EmployeeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.yellow,
-        title: const Text("Employee Application"),
-      ),
+      appBar: AppBar(title: const Text("Employee Application")),
       body: SafeArea(
         child: Center(
           // Keep the layout readable on tablets / landscape.
@@ -244,7 +390,7 @@ class _EmployeeScreenState extends State<EmployeeScreen> {
             child: LayoutBuilder(
               builder: (context, constraints) {
                 return Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+                  padding: const EdgeInsets.fromLTRB(14, 14, 14, 0),
                   child: Column(
                     children: [
                       // The form scrolls on its own when space is short
@@ -255,7 +401,7 @@ class _EmployeeScreenState extends State<EmployeeScreen> {
                         ),
                         child: SingleChildScrollView(child: _buildForm()),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 4),
                       Expanded(child: _buildEmployeeList()),
                     ],
                   ),

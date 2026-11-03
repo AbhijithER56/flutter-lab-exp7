@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Payroll Pad – Experiment 7 | Cloud Firestore</title>
+  <meta name="description" content="Flutter Lab Experiment 7: employee form saving to a Firestore-style collection with a live list (preview uses browser storage)." />
+  <style>
+    :root {
+      --forest: #0E3B2E; --mint: #7FE0B6; --gold: #E9B949; --page: #F1F7F3;
+      --muted: #5F7A6E; --line: #DCEBE2;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      background: #d3e6db; color: var(--forest); min-height: 100vh; padding: 24px 16px;
+      display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; gap: 24px;
+    }
+    .phone { width: 390px; max-width: 100%; height: 800px; background: var(--page); border: 8px solid #08201a; border-radius: 34px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 24px 60px rgba(14,59,46,.35); }
+    .app-bar { background: var(--forest); color: #fff; text-align: center; padding: 20px 12px 14px; font-weight: 700; font-size: 18px; flex-shrink: 0; }
+    .content { flex: 1; display: flex; flex-direction: column; padding: 14px 14px 0; min-height: 0; }
+
+    form { background: #fff; border: 1px solid var(--line); border-radius: 24px; padding: 18px; display: flex; flex-direction: column; gap: 12px; flex-shrink: 0; }
+    .head { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 16px; margin-bottom: 2px; }
+    .field label { display: block; font-size: 12px; color: var(--muted); margin: 0 0 3px 4px; }
+    .field input { width: 100%; padding: 11px 14px; border-radius: 14px; border: 1px solid #D3E5DB; background: #F7FBF9; font-size: 15px; outline: none; color: var(--forest); }
+    .field input:focus { border: 1.8px solid var(--forest); padding: 10.2px 13.2px; }
+    .field.bad input { border-color: #c1121f; }
+    .err { color: #c1121f; font-size: 12px; margin: 3px 0 0 4px; display: none; }
+    .field.bad .err { display: block; }
+    .save { background: var(--forest); color: #fff; border: none; border-radius: 14px; padding: 14px; font-size: 15px; font-weight: 600; cursor: pointer; }
+    .save:active { transform: scale(.98); }
+    .save:disabled { opacity: .6; }
+    .status { text-align: center; font-size: 13px; font-weight: 600; padding: 8px 12px; border-radius: 10px; display: none; }
+    .status.ok { display: block; background: rgba(46,160,67,.12); color: #1f6f31; }
+    .status.no { display: block; background: rgba(220,38,38,.1); color: #c1121f; }
+
+    .dir-head { display: flex; justify-content: space-between; align-items: center; padding: 14px 0 8px; flex-shrink: 0; }
+    .dir-head b { font-size: 16px; font-weight: 800; }
+    .live { background: rgba(127,224,182,.4); border-radius: 12px; padding: 4px 12px; font-size: 12px; font-weight: 700; }
+    .list { flex: 1; overflow-y: auto; padding-bottom: 12px; scrollbar-width: thin; }
+    .emp { display: flex; align-items: center; gap: 12px; background: #fff; border: 1px solid var(--line); border-radius: 18px; padding: 10px 14px; margin-bottom: 8px; animation: pop .35s ease; }
+    @keyframes pop { from { opacity: 0; transform: translateY(-10px) scale(.98); } to { opacity: 1; transform: none; } }
+    .av { width: 42px; height: 42px; border-radius: 12px; background: var(--forest); color: var(--mint); display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
+    .meta { flex: 1; min-width: 0; }
+    .meta b { display: block; font-weight: 700; }
+    .meta small { color: var(--muted); font-size: 12px; }
+    .tag { background: rgba(233,185,73,.28); border-radius: 10px; padding: 4px 10px; font-size: 12px; font-weight: 800; white-space: nowrap; }
+    .none { text-align: center; color: var(--muted); padding: 40px 0; }
+
+    /* Mock Firebase console */
+    .console { width: 320px; max-width: 100%; background: #101e19; color: #cfe9dc; border-radius: 20px; padding: 18px; font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
+    .console h2 { font-family: system-ui, sans-serif; font-size: 15px; color: var(--mint); margin-bottom: 4px; }
+    .console p { color: #8fb3a2; margin-bottom: 12px; line-height: 1.5; }
+    .console button { width: 100%; background: var(--mint); color: var(--forest); border: none; border-radius: 10px; padding: 10px; font-weight: 700; cursor: pointer; margin-bottom: 14px; }
+    .console pre { background: #0a1411; border-radius: 10px; padding: 10px; white-space: pre-wrap; word-break: break-all; max-height: 260px; overflow-y: auto; }
+  </style>
+</head>
+<body>
+  <div class="phone">
+    <div class="app-bar">Employee Application</div>
+    <div class="content">
+      <form id="form" novalidate>
+        <div class="head">🪪 New team member</div>
+        <div class="field" data-f="name"><label>Enter your Name</label><input id="name" autocomplete="off" /><div class="err"></div></div>
+        <div class="field" data-f="empid"><label>Enter your EmpID</label><input id="empid" inputmode="numeric" autocomplete="off" /><div class="err"></div></div>
+        <div class="field" data-f="salary"><label>Enter your Salary</label><input id="salary" inputmode="numeric" autocomplete="off" /><div class="err"></div></div>
+        <button class="save" id="save" type="submit">Save Details</button>
+        <div class="status" id="status"></div>
+      </form>
+
+      <div class="dir-head"><b>Directory</b><span class="live" id="live">0 live</span></div>
+      <div class="list" id="list"></div>
+    </div>
+  </div>
+
+  <aside class="console">
+    <h2>☁️ Firestore console (mock)</h2>
+    <p>Collection <b>employees</b>. Add a document here and watch the phone update without a refresh, like <code>snapshots()</code>.</p>
+    <button id="consoleAdd">＋ Add document from console</button>
+    <pre id="log">// documents will appear here</pre>
+  </aside>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const KEY = 'payroll_pad_employees';
+  let memory = [];
+  const read = () => { try { return JSON.parse(localStorage.getItem(KEY)) || []; } catch (e) { return memory; } };
+  const write = rows => { memory = rows; try { localStorage.setItem(KEY, JSON.stringify(rows)); } catch (e) {} };
+
+  // Same validation messages as the Dart validators
+  const rules = {
+    name: v => !v ? 'Please enter your name' : null,
+    empid: v => { if (!v) return 'Please enter your Employee ID'; const n = Number(v); return (!Number.isInteger(n) || n <= 0) ? 'Employee ID must be a positive number' : null; },
+    salary: v => { if (!v) return 'Please enter your salary'; const n = Number(v); return (!Number.isInteger(n) || n < 0) ? 'Salary must be a valid whole number' : null; },
+  };
+  const inr = n => '₹' + n.toLocaleString('en-IN');
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  // The "snapshots()" listener: re-render whenever the collection changes
+  function onSnapshot() {
+    const docs = read();
+    $('live').textContent = docs.length + ' live';
+    $('list').innerHTML = docs.length ? docs.slice().reverse().map(d => `
+      <div class="emp"><div class="av">👤</div>
+        <div class="meta"><b>${esc(d.name)}</b><small>EMPID: ${d.empid} SALARY:${d.salary}</small></div>
+        <span class="tag">${inr(d.salary)}</span></div>`).join('')
+      : '<div class="none">No Employees Found</div>';
+    $('log').textContent = docs.length ? JSON.stringify(docs.map(({ name, empid, salary }) => ({ name, empid, salary })), null, 1) : '// documents will appear here';
+  }
+
+  // CREATE: employees.add({...})
+  function add(doc) { const rows = read(); rows.push(doc); write(rows); onSnapshot(); }
+
+  $('form').addEventListener('submit', e => {
+    e.preventDefault();
+    let ok = true;
+    for (const k of Object.keys(rules)) {
+      const msg = rules[k]($(k).value.trim());
+      const f = document.querySelector(`[data-f="${k}"]`);
+      f.classList.toggle('bad', !!msg); f.querySelector('.err').textContent = msg || '';
+      if (msg) ok = false;
+    }
+    $('status').className = 'status';
+    if (!ok) return;
+    add({ name: $('name').value.trim(), empid: Number($('empid').value.trim()), salary: Number($('salary').value.trim()) });
+    ['name', 'empid', 'salary'].forEach(k => $(k).value = '');
+    $('status').textContent = 'Data Saved Successfully'; $('status').className = 'status ok';
+  });
+
+  const names = ['Suresh', 'Joel', 'Victor', 'Meena', 'Anitha', 'Karthik'];
+  $('consoleAdd').onclick = () => add({
+    name: names[Math.floor(Math.random() * names.length)],
+    empid: 1000 + Math.floor(Math.random() * 9000),
+    salary: 20000 + 1000 * Math.floor(Math.random() * 80),
+  });
+
+  onSnapshot();
+</script>
+</body>
+</html>
